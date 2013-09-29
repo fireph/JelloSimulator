@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Jello Simulation</title>
+        <!--[if IE]>
+        <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+        <![endif]-->
+    </head>
+    <body>
+        <script src="js/three.min.js"></script>
+        <script src="js/OrbitControls.js"></script>
+        <script src="js/simulator.js"></script>
+        <script>
+
+            var camera, scene, renderer, clock, controls, obj, projector;
+            var directionalLight, plane;
+            var geometry, material, mesh;
+            var simulator, cubeSpringMesh;
+
+            var t = 0;
+            var nt = 0;
+
+            var t2 = 0;
+            var nt2 = 0;
+
+            init();
+            animate();
+
+            function init() {
+                clock = new THREE.Clock();
+                camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 10, 2000 );
+                camera.position.z = 1000;
+                camera.position.y = 200;
+
+                controls = new THREE.OrbitControls( camera );
+
+                scene = new THREE.Scene();
+                projector = new THREE.Projector();
+
+                // directionalLight = new THREE.DirectionalLight( 0xffffff, 1 );
+                // directionalLight.position.set( -1, -1, 1 );
+                // scene.add(directionalLight);
+
+                simulator = new JSIM.Simulator(new THREE.Vector3(0,-20,0));
+                obj = new THREE.Object3D();
+                cubeSpringMesh = new JSIM.Cube(300,300,300,5,5,5,0,700,0, obj);
+                simulator.addSpringMesh(cubeSpringMesh);
+                plane = new JSIM.Plane(new THREE.Vector3(0,0,0), new THREE.Vector3(0.1,1,0).normalize())
+                simulator.addPlane(plane);
+                scene.add(plane.threeObj);
+
+                scene.add(obj);
+
+                renderer = new THREE.CanvasRenderer();
+                renderer.setSize( window.innerWidth, window.innerHeight );
+
+                document.body.appendChild( renderer.domElement );
+
+                document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+
+                function onDocumentMouseDown( event ) {
+                    event.preventDefault();
+
+                    var vector = new THREE.Vector3(
+                        ( event.clientX / window.innerWidth ) * 2 - 1,
+                      - ( event.clientY / window.innerHeight ) * 2 + 1,
+                        0.5
+                    );
+                    projector.unprojectVector( vector, camera );
+
+                    var ray = new THREE.Ray( camera.position, 
+                                             vector.sub( camera.position ).normalize() );
+                    var spheres = cubeSpringMesh.spheres;
+
+                    var dist = 100000;
+                    var center;
+
+                    for (var i = 0; i < spheres.length; i++) {
+                        if (ray.isIntersectionSphere(spheres[i])) {
+                            var l = spheres[i].center.clone().sub(camera.position).length();
+                            if (l < dist) {
+                                center = spheres[i].center;
+                                dist = l;
+                            }
+                        }
+                    }
+
+                    if (center) {
+                        center.add(vector.clone().multiplyScalar(100));
+                    }
+                }
+            }
+
+            function animate() {
+
+                var tdelta = clock.getDelta();
+
+                controls.update(tdelta);
+
+                // note: three.js includes requestAnimationFrame shim
+                requestAnimationFrame( animate );
+
+                obj.children[0].geometry.computeCentroids();
+                obj.children[0].geometry.computeFaceNormals();
+
+                var start = Date.now();
+                simulator.update(tdelta);
+                t += Date.now() - start;
+                nt++;
+                if (nt > 60) {
+                    console.log('sim',t);
+                    t = 0;
+                    nt = 0;
+                }
+
+                var start2 = Date.now();
+                renderer.render( scene, camera );
+                t2 += Date.now() - start2;
+                nt2++;
+                if (nt2 > 60) {
+                    console.log('rend', t2);
+                    t2 = 0;
+                    nt2 = 0;
+                }
+
+            }
+
+        </script>
+    </body>
+</html>
